@@ -1,12 +1,15 @@
-# app.py
+#!/usr/bin/env python3
+"""
+Streamlit app for the API-based ChatPDF implementation.
+"""
 import os
 import tempfile
 import time
 import streamlit as st
 from streamlit_chat import message
-from rag import ChatPDF
+from alternative_method import APIChatPDF
 
-st.set_page_config(page_title="DeepPdf:RAG with Local DeepSeek R1")
+st.set_page_config(page_title="RAG with OpenAI API")
 
 
 def display_messages():
@@ -61,9 +64,40 @@ def page():
     """Main app page layout."""
     if len(st.session_state) == 0:
         st.session_state["messages"] = []
-        st.session_state["assistant"] = ChatPDF()
+        # Get API key from environment or Streamlit secrets
+        api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
+        st.session_state["api_key"] = api_key
 
-    st.header("RAG with Local DeepSeek R1")
+    st.header("RAG with OpenAI API")
+    
+    # API Key input
+    api_key = st.text_input(
+        "OpenAI API Key", 
+        value=st.session_state.get("api_key", ""),
+        type="password", 
+        key="api_key_input"
+    )
+    
+    # Model selection
+    model_options = ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
+    selected_model = st.selectbox(
+        "Select OpenAI Model",
+        options=model_options,
+        index=0,
+        key="model_selection"
+    )
+    
+    # Initialize assistant if API key is provided
+    if api_key:
+        if "assistant" not in st.session_state or st.session_state.get("current_model") != selected_model:
+            st.session_state["assistant"] = APIChatPDF(
+                openai_api_key=api_key,
+                openai_model=selected_model
+            )
+            st.session_state["current_model"] = selected_model
+    else:
+        st.warning("Please enter your OpenAI API key to continue.")
+        return
 
     st.subheader("Upload a Document")
     st.file_uploader(
@@ -97,4 +131,4 @@ def page():
 
 
 if __name__ == "__main__":
-    page()
+    page() 

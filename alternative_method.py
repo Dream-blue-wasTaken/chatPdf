@@ -1,36 +1,71 @@
-# rag.py
-from langchain_core.globals import set_verbose, set_debug
-from langchain_ollama import ChatOllama, OllamaEmbeddings
+"""
+Alternative implementation of ChatPDF using API services instead of local models.
+This module provides the same interface as the original rag.py but uses remote APIs.
+"""
+import os
+import logging
+from typing import List, Dict, Any, Optional
+
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.schema.runnable import RunnablePassthrough
 from langchain.schema.output_parser import StrOutputParser
-from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema.runnable import RunnablePassthrough
+from langchain_community.vectorstores import Chroma
 from langchain_community.vectorstores.utils import filter_complex_metadata
-from langchain_core.prompts import ChatPromptTemplate
-import logging
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-set_debug(True)
-set_verbose(True)
-
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class APIChatPDF:
+    """A class for handling PDF ingestion and question answering using RAG with API services."""
 
-class ChatPDF:
-    """A class for handling PDF ingestion and question answering using RAG."""
-
-    def __init__(self, llm_model: str = "deepseek-r1:latest", embedding_model: str = "mxbai-embed-large"):
+    def __init__(
+        self,
+        openai_api_key: Optional[str] = None,
+        openai_model: str = "gpt-3.5-turbo",
+        embedding_model: str = "text-embedding-ada-002"
+    ):
         """
-        Initialize the ChatPDF instance with an LLM and embedding model.
+        Initialize the APIChatPDF instance with API credentials.
+        
+        Args:
+            openai_api_key: OpenAI API key. If None, will look for OPENAI_API_KEY in environment.
+            openai_model: OpenAI model to use for chat completions
+            embedding_model: OpenAI model to use for embeddings
         """
-        self.model = ChatOllama(model=llm_model)
-        self.embeddings = OllamaEmbeddings(model=embedding_model)
-        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=100)
+        self.openai_api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
+        
+        if not self.openai_api_key:
+            raise ValueError(
+                "OpenAI API key is required. Either pass it as openai_api_key or "
+                "set the OPENAI_API_KEY environment variable."
+            )
+        
+        # Initialize language model and embeddings
+        self.model = ChatOpenAI(
+            model=openai_model,
+            api_key=self.openai_api_key,
+            temperature=0
+        )
+        
+        self.embeddings = OpenAIEmbeddings(
+            model=embedding_model,
+            api_key=self.openai_api_key
+        )
+        
+        # Text splitter for document chunking
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1024, 
+            chunk_overlap=100
+        )
+        
+        # Prompt template for RAG
         self.prompt = ChatPromptTemplate.from_template(
             """
             You are a helpful assistant answering questions based on the uploaded document.
-            Do not show the thinking process.
             Context:
             {context}
             
@@ -40,28 +75,43 @@ class ChatPDF:
             Answer concisely and accurately in three sentences or less.
             """
         )
+        
         self.vector_store = None
         self.retriever = None
 
     def ingest(self, pdf_file_path: str):
         """
         Ingest a PDF file, split its contents, and store the embeddings in the vector store.
+        
+        Args:
+            pdf_file_path: Path to the PDF file to ingest
         """
         logger.info(f"Starting ingestion for file: {pdf_file_path}")
+        
+        # Load and split the document
         docs = PyPDFLoader(file_path=pdf_file_path).load()
         chunks = self.text_splitter.split_documents(docs)
         chunks = filter_complex_metadata(chunks)
 
+        # Create vector store
         self.vector_store = Chroma.from_documents(
             documents=chunks,
             embedding=self.embeddings,
-            persist_directory="chroma_db",
+            persist_directory="chroma_db_api",  # Use a different directory from the local model
         )
         logger.info("Ingestion completed. Document embeddings stored successfully.")
 
     def ask(self, query: str, k: int = 5, score_threshold: float = 0.2):
         """
-        Answer a query using the RAG pipeline.
+        Answer a query using the RAG pipeline with API models.
+        
+        Args:
+            query: The user's question
+            k: Number of documents to retrieve
+            score_threshold: Similarity threshold for retrieval
+            
+        Returns:
+            str: The answer to the query
         """
         if not self.vector_store:
             raise ValueError("No vector store found. Please ingest a document first.")
@@ -90,13 +140,8 @@ class ChatPDF:
             | self.model            # Queries the LLM
             | StrOutputParser()     # Parses the LLM's output
         )
-        """
-            formatted_prompt = self.prompt.invoke(formatted_input)
-    llm_response = self.model.invoke(formatted_prompt)
-    answer = StrOutputParser().invoke(llm_response)
-            """
 
-        logger.info("Generating response using the LLM.")
+        logger.info("Generating response using the OpenAI API.")
         return chain.invoke(formatted_input)
 
     def clear(self):
@@ -105,4 +150,4 @@ class ChatPDF:
         """
         logger.info("Clearing vector store and retriever.")
         self.vector_store = None
-        self.retriever = None
+        self.retriever = None 
