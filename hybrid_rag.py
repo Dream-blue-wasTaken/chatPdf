@@ -1,6 +1,6 @@
 # hybrid_rag.py
 from langchain_core.globals import set_verbose, set_debug
-from langchain_ollama import OllamaEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema.output_parser import StrOutputParser
 from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import PyPDFLoader
@@ -29,7 +29,7 @@ class HybridChatPDF:
         self, 
         together_api_key: str = "fa80595b027f7af95287cb1ec86b2650fd7f09a63e71a596390860cafa191ed5",
         together_model: str = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free",
-        embedding_model: str = "mxbai-embed-large"
+        embedding_model: str = "all-MiniLM-L6-v2"
     ):
         """
         Initialize the HybridChatPDF instance with Together API and local embeddings.
@@ -37,15 +37,15 @@ class HybridChatPDF:
         Args:
             together_api_key: Together API key
             together_model: Model ID on Together (default: DeepSeek R1)
-            embedding_model: Local Ollama embedding model
+            embedding_model: HuggingFace embedding model name
         """
         # Initialize Together API client
         self.together_api_key = together_api_key or os.environ.get("TOGETHER_API_KEY")
         self.together_model = together_model
         self.together_client = Together(api_key=self.together_api_key)
         
-        # Initialize local embeddings
-        self.embeddings = OllamaEmbeddings(model=embedding_model)
+        # Initialize local embeddings using HuggingFaceEmbeddings
+        self.embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
         
         # Text splitter for chunking
         self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=100)

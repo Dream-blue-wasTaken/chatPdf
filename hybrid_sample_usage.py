@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Sample script demonstrating the hybrid approach:
-- Local embeddings and chunking (using Ollama)
+- Local embeddings using HuggingFace sentence-transformers
 - Together API for LLM responses
 """
 import os
@@ -9,7 +9,7 @@ import argparse
 from hybrid_rag import HybridChatPDF
 
 def main():
-    parser = argparse.ArgumentParser(description="Chat with a PDF using hybrid RAG (local embeddings + Together API)")
+    parser = argparse.ArgumentParser(description="Chat with a PDF using hybrid RAG (HuggingFace embeddings + Together API)")
     parser.add_argument("--pdf", type=str, required=True, help="Path to the PDF file")
     parser.add_argument("--together_api_key", type=str, 
                         default="fa80595b027f7af95287cb1ec86b2650fd7f09a63e71a596390860cafa191ed5", 
@@ -18,8 +18,8 @@ def main():
                         default="deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free", 
                         help="Together model name")
     parser.add_argument("--embedding_model", type=str, 
-                        default="mxbai-embed-large", 
-                        help="Local Ollama embedding model")
+                        default="all-MiniLM-L6-v2", 
+                        help="HuggingFace embedding model name")
     parser.add_argument("--k", type=int, default=5, help="Number of chunks to retrieve")
     parser.add_argument("--threshold", type=float, default=0.2, help="Similarity threshold")
     
@@ -29,7 +29,7 @@ def main():
     os.environ["TOGETHER_API_KEY"] = args.together_api_key
     
     # Initialize the hybrid ChatPDF system
-    print("Initializing HybridChatPDF with local Ollama embeddings and Together API for responses...")
+    print("Initializing HybridChatPDF with HuggingFace embeddings and Together API for responses...")
     print(f"Using embedding model: {args.embedding_model}")
     print(f"Using LLM model: {args.together_model}")
     

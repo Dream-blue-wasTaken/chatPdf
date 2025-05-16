@@ -90,28 +90,28 @@ def page():
         key="together_model_selection"
     )
     
-    # Ollama model selection for embeddings
-    ollama_model_options = ["mxbai-embed-large", "nomic-embed-text", "all-MiniLM-L6-v2"]
-    selected_ollama_model = st.selectbox(
-        "Select Ollama Embedding Model",
-        options=ollama_model_options,
+    # HuggingFace model selection for embeddings
+    embedding_model_options = ["all-MiniLM-L6-v2", "sentence-transformers/all-mpnet-base-v2", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"]
+    selected_embedding_model = st.selectbox(
+        "Select Embedding Model",
+        options=embedding_model_options,
         index=0,
         key="ollama_model_selection"
     )
     
     # Initialize assistant
-    if "assistant" not in st.session_state or st.session_state.get("current_together_model") != selected_together_model or st.session_state.get("current_ollama_model") != selected_ollama_model:
+    if "assistant" not in st.session_state or st.session_state.get("current_together_model") != selected_together_model or st.session_state.get("current_ollama_model") != selected_embedding_model:
         try:
             st.session_state["assistant"] = HybridChatPDF(
                 together_api_key=together_api_key,
                 together_model=selected_together_model,
-                embedding_model=selected_ollama_model
+                embedding_model=selected_embedding_model
             )
             st.session_state["current_together_model"] = selected_together_model
-            st.session_state["current_ollama_model"] = selected_ollama_model
+            st.session_state["current_ollama_model"] = selected_embedding_model
         except Exception as e:
             st.error(f"Error initializing the assistant: {str(e)}")
-            st.info("Make sure you have Ollama running locally with the selected embedding model")
+            st.info("Check the availability of the selected embedding model")
             return
 
     st.subheader("Upload a Document")
