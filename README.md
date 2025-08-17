@@ -122,7 +122,6 @@ You can customize various aspects of the application:
 - **Empty Responses**: Adjust the similarity threshold to a lower value
 - **Irrelevant Answers**: Try increasing the `k` value to retrieve more context
 
-## License
 
-[Specify your license here]
+
 
