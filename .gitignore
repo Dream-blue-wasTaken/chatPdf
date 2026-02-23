@@ -1,14 +1,22 @@
+# Python environments and caches
 venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-.env
-.venv
+.venv/
 env/
 ENV/
-chroma_db/
+__pycache__/
+*.py[cod]
+.Python
+*.so
+
+# Local config
+.env
 .DS_Store
-.vscode/ 
+.vscode/
+
+# Vector stores / generated DB artifacts
+chroma_db/
+chroma_db_pdf/
+chroma_db_hybrid/
+*.sqlite3
+*.bin
+*.pickle

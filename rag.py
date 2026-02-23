@@ -1,53 +1,51 @@
-# rag.py
-from langchain_core.globals import set_verbose, set_debug
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain.schema.output_parser import StrOutputParser
-from langchain_community.vectorstores import Chroma
-from langchain_community.document_loaders import PyPDFLoader
+import logging
+from typing import Optional
+
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.schema.output_parser import StrOutputParser
 from langchain.schema.runnable import RunnablePassthrough
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import Chroma
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_core.prompts import ChatPromptTemplate
-import logging
+from langchain_ollama import ChatOllama, OllamaEmbeddings
 
-set_debug(True)
-set_verbose(True)
-
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class ChatPDF:
-    """A class for handling PDF ingestion and question answering using RAG."""
+    """Handles PDF ingestion and question answering with a RAG pipeline."""
 
-    def __init__(self, llm_model: str = "deepseek-r1:latest", embedding_model: str = "mxbai-embed-large"):
-        """
-        Initialize the ChatPDF instance with an LLM and embedding model.
-        """
+    def __init__(
+        self,
+        llm_model: str = "deepseek-r1:latest",
+        embedding_model: str = "mxbai-embed-large",
+        persist_directory: str = "chroma_db",
+    ):
         self.model = ChatOllama(model=llm_model)
         self.embeddings = OllamaEmbeddings(model=embedding_model)
         self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=100)
+        self.persist_directory = persist_directory
         self.prompt = ChatPromptTemplate.from_template(
             """
             You are a helpful assistant answering questions based on the uploaded document.
             Do not show the thinking process.
+
             Context:
             {context}
-            
+
             Question:
             {question}
-            
+
             Answer concisely and accurately in three sentences or less.
             """
         )
-        self.vector_store = None
-        self.retriever = None
 
-    def ingest(self, pdf_file_path: str):
-        """
-        Ingest a PDF file, split its contents, and store the embeddings in the vector store.
-        """
-        logger.info(f"Starting ingestion for file: {pdf_file_path}")
+        self.vector_store: Optional[Chroma] = None
+
+    def ingest(self, pdf_file_path: str) -> None:
+        """Ingest a PDF file, split it into chunks, and store embeddings in Chroma."""
+        logger.info("Starting ingestion for file: %s", pdf_file_path)
         docs = PyPDFLoader(file_path=pdf_file_path).load()
         chunks = self.text_splitter.split_documents(docs)
         chunks = filter_complex_metadata(chunks)
@@ -55,25 +53,22 @@ class ChatPDF:
         self.vector_store = Chroma.from_documents(
             documents=chunks,
             embedding=self.embeddings,
-            persist_directory="chroma_db",
+            persist_directory=self.persist_directory,
         )
-        logger.info("Ingestion completed. Document embeddings stored successfully.")
+        logger.info("Ingestion completed and embeddings stored successfully.")
 
-    def ask(self, query: str, k: int = 5, score_threshold: float = 0.2):
-        """
-        Answer a query using the RAG pipeline.
-        """
+    def ask(self, query: str, k: int = 5, score_threshold: float = 0.2) -> str:
+        """Answer a query using retrieved document context and the configured model."""
         if not self.vector_store:
             raise ValueError("No vector store found. Please ingest a document first.")
 
-        if not self.retriever:
-            self.retriever = self.vector_store.as_retriever(
-                search_type="similarity_score_threshold",
-                search_kwargs={"k": k, "score_threshold": score_threshold},
-            )
+        retriever = self.vector_store.as_retriever(
+            search_type="similarity_score_threshold",
+            search_kwargs={"k": k, "score_threshold": score_threshold},
+        )
 
-        logger.info(f"Retrieving context for query: {query}")
-        retrieved_docs = self.retriever.invoke(query)
+        logger.info("Retrieving context for query: %s", query)
+        retrieved_docs = retriever.invoke(query)
 
         if not retrieved_docs:
             return "No relevant context found in the document to answer your question."
@@ -83,26 +78,17 @@ class ChatPDF:
             "question": query,
         }
 
-        # Build the RAG chain
         chain = (
-            RunnablePassthrough()  # Passes the input as-is
-            | self.prompt           # Formats the input for the LLM
-            | self.model            # Queries the LLM
-            | StrOutputParser()     # Parses the LLM's output
+            RunnablePassthrough()
+            | self.prompt
+            | self.model
+            | StrOutputParser()
         )
-        """
-            formatted_prompt = self.prompt.invoke(formatted_input)
-    llm_response = self.model.invoke(formatted_prompt)
-    answer = StrOutputParser().invoke(llm_response)
-            """
 
         logger.info("Generating response using the LLM.")
         return chain.invoke(formatted_input)
 
-    def clear(self):
-        """
-        Reset the vector store and retriever.
-        """
-        logger.info("Clearing vector store and retriever.")
+    def clear(self) -> None:
+        """Reset in-memory vector store reference."""
+        logger.info("Clearing vector store reference.")
         self.vector_store = None
-        self.retriever = None
