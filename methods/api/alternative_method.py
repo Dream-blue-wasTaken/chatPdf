@@ -4,7 +4,7 @@ This module provides the same interface as the original rag.py but uses remote A
 """
 import os
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Optional
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnablePassthrough
@@ -28,7 +28,8 @@ class APIChatPDF:
         openai_api_key: Optional[str] = None,
         openai_model: str = "gpt-3.5-turbo",
         openai_api_base: Optional[str] = None,
-        embedding_model: str = "BAAI/bge-small-en-v1.5"
+        embedding_model: str = "BAAI/bge-small-en-v1.5",
+        persist_directory: str = "chroma_db_api",
     ):
         """
         Initialize the APIChatPDF instance with API credentials.
@@ -38,6 +39,7 @@ class APIChatPDF:
             openai_model: OpenAI model to use for chat completions
             openai_api_base: Base URL for OpenAI-compatible API
             embedding_model: Hugging Face model to use for local embeddings
+            persist_directory: Path for persisted Chroma database files
         """
         self.openai_api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
         
@@ -81,9 +83,8 @@ class APIChatPDF:
             Answer concisely and accurately in three sentences or less.
             """
         )
-        
+        self.persist_directory = persist_directory
         self.vector_store = None
-        self.retriever = None
 
     def ingest(self, pdf_file_path: str):
         """
@@ -99,12 +100,16 @@ class APIChatPDF:
         chunks = self.text_splitter.split_documents(docs)
         chunks = filter_complex_metadata(chunks)
 
+        if not chunks:
+            raise ValueError("No text could be extracted from the PDF.")
+
         # Create vector store
         self.vector_store = Chroma.from_documents(
             documents=chunks,
             embedding=self.embeddings,
-            persist_directory="chroma_db_api",  # Use a different directory from the local model
+            persist_directory=self.persist_directory,
         )
+        self.vector_store.persist()
         logger.info("Ingestion completed. Document embeddings stored successfully.")
 
     def ask(self, query: str, k: int = 5, score_threshold: float = 0.2):
@@ -122,14 +127,13 @@ class APIChatPDF:
         if not self.vector_store:
             raise ValueError("No vector store found. Please ingest a document first.")
 
-        if not self.retriever:
-            self.retriever = self.vector_store.as_retriever(
-                search_type="similarity_score_threshold",
-                search_kwargs={"k": k, "score_threshold": score_threshold},
-            )
+        retriever = self.vector_store.as_retriever(
+            search_type="similarity_score_threshold",
+            search_kwargs={"k": k, "score_threshold": score_threshold},
+        )
 
         logger.info(f"Retrieving context for query: {query}")
-        retrieved_docs = self.retriever.invoke(query)
+        retrieved_docs = retriever.invoke(query)
 
         if not retrieved_docs:
             return "No relevant context found in the document to answer your question."
@@ -155,5 +159,6 @@ class APIChatPDF:
         Reset the vector store and retriever.
         """
         logger.info("Clearing vector store and retriever.")
+        if self.vector_store is not None:
+            self.vector_store.delete_collection()
         self.vector_store = None
-        self.retriever = None 

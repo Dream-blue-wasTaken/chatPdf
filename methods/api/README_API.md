@@ -1,95 +1,48 @@
 # API-Based ChatPDF Implementation
 
-This is an alternative implementation of the ChatPDF application that uses OpenAI's API instead of running models locally with Ollama.
+This implementation uses an OpenAI-compatible chat API with local Hugging Face embeddings.
 
 ## Files
 
-- `alternative_method.py`: The main API-based implementation class `APIChatPDF`
-- `api_sample_usage.py`: A CLI script that demonstrates how to use the API implementation
-- `api_app.py`: A Streamlit app similar to the original one but using the API implementation
+- `alternative_method.py`: `APIChatPDF` class for ingestion + retrieval + chat.
+- `api_sample_usage.py`: CLI usage for testing API RAG.
+- `api_app.py`: Streamlit UI for API RAG.
+- `../../hf_app.py`: root-level Hugging Face Spaces entrypoint for API mode.
 
 ## Requirements
 
-To use this API-based implementation, you'll need:
-https://github.com/vanzan01/cursor-memory-bank
-1. An OpenAI API key
-2. The following Python packages:
-   - langchain
-   - langchain-openai
-   - langchain-community
-   - langchain-core
-   - openai
-   - streamlit (for the web app)
-   - streamlit-chat (for the web app)
-
-You can install the requirements with:
+Install project dependencies:
 
 ```bash
-pip install langchain langchain-openai langchain-community langchain-core openai streamlit streamlit-chat
+pip install -r requirements.txt
 ```
 
-## Using the API implementation
-
-### Command Line Interface
+## Run locally
 
 ```bash
-# Basic usage
-python api_sample_usage.py --pdf your_document.pdf --openai_api_key your_api_key
-
-# Specifying model and retrieval parameters
-python api_sample_usage.py --pdf your_document.pdf --model gpt-4 --k 3 --threshold 0.3
+streamlit run methods/api/api_app.py
 ```
 
-You can also set your API key as an environment variable:
+Environment variables (optional):
+
+- `OPENAI_API_KEY`
+- `OPENAI_API_BASE` (default: `https://api.longcat.chat/openai/v1`)
+- `EMBEDDING_MODEL` (default: `BAAI/bge-small-en-v1.5`)
+
+## CLI usage
 
 ```bash
-# Unix/Linux/MacOS
-export OPENAI_API_KEY=your_api_key
-
-# Windows
-set OPENAI_API_KEY=your_api_key
+python methods/api/api_sample_usage.py --pdf your_document.pdf --openai_api_key your_api_key
 ```
 
-### Streamlit Web App
+## Hugging Face Spaces deployment (Streamlit)
 
-Run the Streamlit app with:
+1. Create a **Streamlit Space**.
+2. Push this repo to the Space.
+3. In Space **Settings → Variables and secrets**, add:
+   - `OPENAI_API_KEY` (secret)
+   - optional: `OPENAI_API_BASE`, `EMBEDDING_MODEL`
+4. Set the Space app file to `hf_app.py`.
+5. Keep `requirements.txt` from this repo.
 
-```bash
-streamlit run api_app.py
-```
-
-In the app:
-1. Enter your OpenAI API key
-2. Select the model you want to use
-3. Upload your PDF document
-4. Adjust the retrieval settings if needed
-5. Start chatting with your document
-
-## Differences from local implementation
-
-This API-based implementation:
-
-1. Uses OpenAI models instead of locally hosted models via Ollama
-2. Requires an API key and internet connection
-3. May provide more accurate responses (depending on the model used)
-4. Incurs API usage costs
-5. Uses a different vector store directory (`chroma_db_api`) to avoid conflicts
-
-## Integration
-
-The `APIChatPDF` class provides the same interface as the original `ChatPDF` class, so you can switch between them with minimal code changes.
-
-Example:
-```python
-# Local version
-from rag import ChatPDF
-chat = ChatPDF()
-
-# API version
-from methods.api.alternative_method import APIChatPDF
-chat = APIChatPDF(openai_api_key="your_api_key")
-
-# Both versions use the same methods
-chat.ingest("document.pdf")
-answer = chat.ask("What is this document about?")
-``` 
+This avoids requiring Ollama in Spaces and uses the API-based pipeline directly.
