@@ -4,7 +4,7 @@ Sample script demonstrating how to use the Together API-based ChatPDF implementa
 """
 import os
 import argparse
-from together_method import TogetherChatPDF
+from methods.together.together_method import TogetherChatPDF
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with a PDF using Together API-based RAG")

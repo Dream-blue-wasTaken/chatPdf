@@ -4,7 +4,7 @@ Sample script demonstrating how to use the API-based ChatPDF implementation.
 """
 import os
 import argparse
-from alternative_method import APIChatPDF
+from methods.api.alternative_method import APIChatPDF
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with a PDF using API-based RAG")

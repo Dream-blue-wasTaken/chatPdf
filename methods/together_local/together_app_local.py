@@ -8,7 +8,7 @@ import tempfile
 import time
 import streamlit as st
 from streamlit_chat import message
-from together_method_local import TogetherChatPDFLocal
+from methods.together_local.together_method_local import TogetherChatPDFLocal
 
 st.set_page_config(page_title="RAG with Together AI (Local Embeddings)")
 

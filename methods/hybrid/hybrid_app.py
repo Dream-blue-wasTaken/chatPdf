@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Streamlit app for the API-based ChatPDF implementation.
+Streamlit app for hybrid RAG with local Ollama embeddings and Together API responses.
 """
 import os
 import tempfile
 import time
 import streamlit as st
 from streamlit_chat import message
-from alternative_method import APIChatPDF
+from methods.hybrid.hybrid_rag import HybridChatPDF
 
-st.set_page_config(page_title="RAG with OpenAI API")
+st.set_page_config(page_title="Hybrid RAG with Together API")
 
 
 def display_messages():
@@ -33,6 +33,8 @@ def process_input():
                 )
             except ValueError as e:
                 agent_text = str(e)
+            except Exception as e:
+                agent_text = f"Error: {str(e)}"
 
         st.session_state["messages"].append((user_text, True))
         st.session_state["messages"].append((agent_text, False))
@@ -64,40 +66,53 @@ def page():
     """Main app page layout."""
     if len(st.session_state) == 0:
         st.session_state["messages"] = []
-        # Get API key from environment or Streamlit secrets
-        api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
-        st.session_state["api_key"] = api_key
+        # Get API key from environment or try to use default
+        together_api_key = os.environ.get("TOGETHER_API_KEY", "fa80595b027f7af95287cb1ec86b2650fd7f09a63e71a596390860cafa191ed5")
+        st.session_state["together_api_key"] = together_api_key
 
-    st.header("RAG with OpenAI API")
+    st.header("Hybrid RAG with Together AI - DeepSeek R1")
+    st.markdown("This version uses local Ollama embeddings with Together AI for responses")
     
-    # API Key input
-    api_key = st.text_input(
-        "OpenAI API Key", 
-        value=st.session_state.get("api_key", ""),
+    # Together API Key input
+    together_api_key = st.text_input(
+        "Together API Key", 
+        value=st.session_state.get("together_api_key", "fa80595b027f7af95287cb1ec86b2650fd7f09a63e71a596390860cafa191ed5"),
         type="password", 
-        key="api_key_input"
+        key="together_api_key_input"
     )
     
-    # Model selection
-    model_options = ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
-    selected_model = st.selectbox(
-        "Select OpenAI Model",
-        options=model_options,
+    # Together model selection
+    together_model_options = ["deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free", "together/llama-2-7b-chat"]
+    selected_together_model = st.selectbox(
+        "Select Together AI Model",
+        options=together_model_options,
         index=0,
-        key="model_selection"
+        key="together_model_selection"
     )
     
-    # Initialize assistant if API key is provided
-    if api_key:
-        if "assistant" not in st.session_state or st.session_state.get("current_model") != selected_model:
-            st.session_state["assistant"] = APIChatPDF(
-                openai_api_key=api_key,
-                openai_model=selected_model
+    # HuggingFace model selection for embeddings
+    embedding_model_options = ["all-MiniLM-L6-v2", "sentence-transformers/all-mpnet-base-v2", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"]
+    selected_embedding_model = st.selectbox(
+        "Select Embedding Model",
+        options=embedding_model_options,
+        index=0,
+        key="ollama_model_selection"
+    )
+    
+    # Initialize assistant
+    if "assistant" not in st.session_state or st.session_state.get("current_together_model") != selected_together_model or st.session_state.get("current_ollama_model") != selected_embedding_model:
+        try:
+            st.session_state["assistant"] = HybridChatPDF(
+                together_api_key=together_api_key,
+                together_model=selected_together_model,
+                embedding_model=selected_embedding_model
             )
-            st.session_state["current_model"] = selected_model
-    else:
-        st.warning("Please enter your OpenAI API key to continue.")
-        return
+            st.session_state["current_together_model"] = selected_together_model
+            st.session_state["current_ollama_model"] = selected_embedding_model
+        except Exception as e:
+            st.error(f"Error initializing the assistant: {str(e)}")
+            st.info("Check the availability of the selected embedding model")
+            return
 
     st.subheader("Upload a Document")
     st.file_uploader(
