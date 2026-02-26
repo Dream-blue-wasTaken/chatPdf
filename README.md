@@ -83,6 +83,7 @@ Yes — this project can be hosted on **Hugging Face Spaces**.
    - `methods/together/together_app.py`
    - `methods/api/api_app.py`
 5. Ensure `requirements.txt` includes all dependencies used by the selected method.
+6. For an API-first Space, use the ready entrypoint `hf_app.py` (wraps `methods/api/api_app.py`).
 
 If you want, I can also add a ready-to-use **Hugging Face Space configuration** file next.
 
