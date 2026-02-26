@@ -5,7 +5,7 @@ No OpenAI API key required!
 """
 import os
 import argparse
-from together_method_local import TogetherChatPDFLocal
+from methods.together_local.together_method_local import TogetherChatPDFLocal
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with a PDF using Together API-based RAG with local embeddings")

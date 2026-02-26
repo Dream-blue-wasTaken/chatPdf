@@ -6,7 +6,7 @@ Sample script demonstrating the hybrid approach:
 """
 import os
 import argparse
-from hybrid_rag import HybridChatPDF
+from methods.hybrid.hybrid_rag import HybridChatPDF
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with a PDF using hybrid RAG (HuggingFace embeddings + Together API)")

@@ -86,7 +86,7 @@ from rag import ChatPDF
 chat = ChatPDF()
 
 # API version
-from alternative_method import APIChatPDF
+from methods.api.alternative_method import APIChatPDF
 chat = APIChatPDF(openai_api_key="your_api_key")
 
 # Both versions use the same methods

@@ -53,10 +53,38 @@ streamlit run app.py
 
 ## Project Structure
 
-- `app.py` — Streamlit chat interface.
-- `rag.py` — core ChatPDF class (ingest + ask + clear).
-- `hybrid_*.py`, `api_*.py`, `together_*.py` — experimental/provider-specific variants.
-- `README_*.md`, `SETUP_HYBRID.md` — variant-specific setup notes.
+- `app.py` — main Streamlit chat interface (local Ollama path).
+- `rag.py` — core ChatPDF class for the main local method.
+- `methods/api/` — OpenAI API-based method (`api_app.py`, `api_sample_usage.py`, `alternative_method.py`).
+- `methods/together/` — Together AI method (`together_app.py`, `together_sample_usage.py`, `together_method.py`).
+- `methods/together_local/` — Together AI + local embeddings method.
+- `methods/hybrid/` — Hybrid retrieval method and setup guides.
+
+This keeps the **main method in the repository root** while organizing each alternative method in its own folder.
+
+---
+
+## Can I host this on Hugging Face Spaces?
+
+Yes — this project can be hosted on **Hugging Face Spaces**.
+
+### Recommended deployment target
+
+- Deploy `app.py` as a **Streamlit Space** if you want the main local-first UX.
+- If your Space cannot run local Ollama, deploy an API-based variant instead (for example `methods/together/together_app.py` or `methods/api/api_app.py`).
+
+### Basic steps
+
+1. Create a new Space on Hugging Face and choose **Streamlit**.
+2. Push this repository to the Space (or upload files).
+3. In Space settings, add required secrets (e.g., `TOGETHER_API_KEY`, `OPENAI_API_KEY`).
+4. Set the app entrypoint in your Space to one of:
+   - `app.py` (main local method)
+   - `methods/together/together_app.py`
+   - `methods/api/api_app.py`
+5. Ensure `requirements.txt` includes all dependencies used by the selected method.
+
+If you want, I can also add a ready-to-use **Hugging Face Space configuration** file next.
 
 ---
 
@@ -74,4 +102,3 @@ To keep the repository clean and recruiter-friendly:
 - Built a local-first ChatPDF application using LangChain, Chroma, Ollama, and Streamlit.
 - Implemented a configurable RAG pipeline with PDF ingestion, chunked embeddings, and threshold-based retrieval.
 - Developed multiple inference backends (local and API-based) to compare quality/cost/latency tradeoffs.
-

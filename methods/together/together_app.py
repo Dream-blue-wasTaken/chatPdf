@@ -7,7 +7,7 @@ import tempfile
 import time
 import streamlit as st
 from streamlit_chat import message
-from together_method import TogetherChatPDF
+from methods.together.together_method import TogetherChatPDF
 
 st.set_page_config(page_title="RAG with Together AI")
 
