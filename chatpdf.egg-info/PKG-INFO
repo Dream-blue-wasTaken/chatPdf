@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: chatpdf
+Version: 0.1.0
+Summary: A RAG-based ChatPDF application using Streamlit
+Author-email: Your Name <your.email@example.com>
+Requires-Python: >=3.9
+Requires-Dist: streamlit>=1.30.0
+Requires-Dist: langchain>=0.1.0
+Requires-Dist: langchain-ollama>=0.0.1
+Requires-Dist: langchain-community>=0.0.10
+Requires-Dist: langchain-openai>=0.0.2
+Requires-Dist: langchain-huggingface>=0.0.1
+Requires-Dist: streamlit-chat>=0.1.1
+Requires-Dist: pypdf>=4.0.0
+Requires-Dist: chromadb>=0.4.22
+Requires-Dist: together>=1.0.0
+Requires-Dist: sentence-transformers>=2.3.0

@@ -2,6 +2,8 @@ streamlit
 langchain
 langchain_ollama
 langchain_community
+langchain_openai
+langchain_huggingface
 streamlit-chat
 pypdf
 chromadb

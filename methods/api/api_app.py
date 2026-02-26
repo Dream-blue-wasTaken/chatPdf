@@ -3,13 +3,18 @@
 Streamlit app for the API-based ChatPDF implementation.
 """
 import os
+import sys
 import tempfile
 import time
 import streamlit as st
+
+# Add the project root to the path so that 'methods' can be found
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from streamlit_chat import message
 from methods.api.alternative_method import APIChatPDF
 
-st.set_page_config(page_title="RAG with OpenAI API")
+st.set_page_config(page_title="RAG with LongCat API")
 
 
 def display_messages():
@@ -64,24 +69,32 @@ def page():
     """Main app page layout."""
     if len(st.session_state) == 0:
         st.session_state["messages"] = []
-        # Get API key from environment or Streamlit secrets
-        api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
+        # Get API key from environment, Streamlit secrets or default
+        api_key = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "ak_2VT9sK06I7615xw05t7pW98F96557")
         st.session_state["api_key"] = api_key
+        st.session_state["api_base"] = "https://api.longcat.chat/openai/v1"
 
-    st.header("RAG with OpenAI API")
+    st.header("RAG with LongCat API")
     
     # API Key input
     api_key = st.text_input(
-        "OpenAI API Key", 
+        "API Key", 
         value=st.session_state.get("api_key", ""),
         type="password", 
         key="api_key_input"
     )
     
+    # API Base URL
+    api_base = st.text_input(
+        "API Base URL",
+        value=st.session_state.get("api_base", "https://api.longcat.chat/openai/v1"),
+        key="api_base_input"
+    )
+    
     # Model selection
-    model_options = ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
+    model_options = ["LongCat-Flash-Lite", "gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
     selected_model = st.selectbox(
-        "Select OpenAI Model",
+        "Select Model",
         options=model_options,
         index=0,
         key="model_selection"
@@ -89,14 +102,18 @@ def page():
     
     # Initialize assistant if API key is provided
     if api_key:
-        if "assistant" not in st.session_state or st.session_state.get("current_model") != selected_model:
+        if ("assistant" not in st.session_state or 
+            st.session_state.get("current_model") != selected_model or
+            st.session_state.get("current_api_base") != api_base):
             st.session_state["assistant"] = APIChatPDF(
                 openai_api_key=api_key,
-                openai_model=selected_model
+                openai_model=selected_model,
+                openai_api_base=api_base
             )
             st.session_state["current_model"] = selected_model
+            st.session_state["current_api_base"] = api_base
     else:
-        st.warning("Please enter your OpenAI API key to continue.")
+        st.warning("Please enter your API key to continue.")
         return
 
     st.subheader("Upload a Document")

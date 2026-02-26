@@ -13,7 +13,8 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_community.vectorstores.utils import filter_complex_metadata
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +27,8 @@ class APIChatPDF:
         self,
         openai_api_key: Optional[str] = None,
         openai_model: str = "gpt-3.5-turbo",
-        embedding_model: str = "text-embedding-ada-002"
+        openai_api_base: Optional[str] = None,
+        embedding_model: str = "BAAI/bge-small-en-v1.5"
     ):
         """
         Initialize the APIChatPDF instance with API credentials.
@@ -34,7 +36,8 @@ class APIChatPDF:
         Args:
             openai_api_key: OpenAI API key. If None, will look for OPENAI_API_KEY in environment.
             openai_model: OpenAI model to use for chat completions
-            embedding_model: OpenAI model to use for embeddings
+            openai_api_base: Base URL for OpenAI-compatible API
+            embedding_model: Hugging Face model to use for local embeddings
         """
         self.openai_api_key = openai_api_key or os.environ.get("OPENAI_API_KEY")
         
@@ -45,15 +48,18 @@ class APIChatPDF:
             )
         
         # Initialize language model and embeddings
-        self.model = ChatOpenAI(
-            model=openai_model,
-            api_key=self.openai_api_key,
-            temperature=0
-        )
+        chat_kwargs = {
+            "model": openai_model,
+            "api_key": self.openai_api_key,
+            "temperature": 0
+        }
+        if openai_api_base:
+            chat_kwargs["base_url"] = openai_api_base
+            
+        self.model = ChatOpenAI(**chat_kwargs)
         
-        self.embeddings = OpenAIEmbeddings(
-            model=embedding_model,
-            api_key=self.openai_api_key
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name=embedding_model
         )
         
         # Text splitter for document chunking
@@ -141,7 +147,7 @@ class APIChatPDF:
             | StrOutputParser()     # Parses the LLM's output
         )
 
-        logger.info("Generating response using the OpenAI API.")
+        logger.info("Generating response using the API.")
         return chain.invoke(formatted_input)
 
     def clear(self):
