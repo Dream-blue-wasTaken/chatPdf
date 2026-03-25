@@ -103,13 +103,15 @@ class APIChatPDF:
         if not chunks:
             raise ValueError("No text could be extracted from the PDF.")
 
-        # Create vector store
-        self.vector_store = Chroma.from_documents(
-            documents=chunks,
-            embedding=self.embeddings,
-            persist_directory=self.persist_directory,
-        )
-        self.vector_store.persist()
+        # Create or append to the vector store
+        if self.vector_store is None:
+            self.vector_store = Chroma.from_documents(
+                documents=chunks,
+                embedding=self.embeddings,
+                persist_directory=self.persist_directory,
+            )
+        else:
+            self.vector_store.add_documents(chunks)
         logger.info("Ingestion completed. Document embeddings stored successfully.")
 
     def ask(self, query: str, k: int = 5, score_threshold: float = 0.2):

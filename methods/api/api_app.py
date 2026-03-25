@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Streamlit app for the API-based ChatPDF implementation.
+Credentials are loaded from environment variables (e.g. .env.local).
 """
 
 import os
@@ -10,6 +11,15 @@ import time
 
 import streamlit as st
 from streamlit_chat import message
+from dotenv import load_dotenv
+
+# Load .env.local (or .env) from the project root
+load_dotenv(
+    dotenv_path=os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        ".env.local",
+    )
+)
 
 # Add the project root to the path so that 'methods' can be found
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -34,6 +44,10 @@ def process_input() -> None:
         return
 
     user_text = user_input.strip()
+
+    # Clear the input box immediately
+    st.session_state["user_input"] = ""
+
     with st.session_state["thinking_spinner"], st.spinner("Thinking..."):
         try:
             agent_text = st.session_state["assistant"].ask(
@@ -49,12 +63,35 @@ def process_input() -> None:
 
 
 def read_and_save_file() -> None:
-    """Handle file upload and ingestion."""
-    st.session_state["assistant"].clear()
-    st.session_state["messages"] = []
-    st.session_state["user_input"] = ""
+    """Handle file upload and ingestion.
 
-    for file in st.session_state["file_uploader"]:
+    Streamlit fires on_change with ALL currently selected files whenever the
+    uploader changes (add or remove). We track which filenames were already
+    ingested so we only process genuinely new files.
+
+    If a file was *removed* from the uploader we must rebuild from scratch
+    because Chroma doesn't support selective document deletion by source.
+    """
+    current_files = {f.name: f for f in st.session_state["file_uploader"]}
+    current_names = set(current_files.keys())
+    already_ingested = st.session_state.get("ingested_files", set())
+
+    # Detect removals — if any previously ingested file is no longer selected,
+    # clear everything and re-ingest all remaining files from scratch.
+    removed = already_ingested - current_names
+    if removed:
+        st.session_state["assistant"].clear()
+        st.session_state["ingested_files"] = set()
+        st.session_state["messages"] = []
+        st.session_state["user_input"] = ""
+        files_to_ingest = list(current_files.values())
+    else:
+        # Only ingest files that haven't been seen before
+        files_to_ingest = [
+            f for name, f in current_files.items() if name not in already_ingested
+        ]
+
+    for file in files_to_ingest:
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             temp_file.write(file.getbuffer())
             file_path = temp_file.name
@@ -65,85 +102,52 @@ def read_and_save_file() -> None:
                 st.session_state["assistant"].ingest(file_path)
                 end_time = time.time()
 
+            st.session_state["ingested_files"].add(file.name)
             st.session_state["messages"].append(
                 (f"Ingested {file.name} in {end_time - start_time:.2f} seconds", False)
             )
+        except Exception as exc:
+            st.session_state["messages"].append((f"Error ingesting {file.name}: {exc}", False))
         finally:
             if os.path.exists(file_path):
                 os.remove(file_path)
 
 
-def _init_assistant(api_key: str, api_base: str, selected_model: str, embedding_model: str) -> None:
-    """Initialize APIChatPDF and keep state in sync when settings change."""
-    needs_reinit = (
-        "assistant" not in st.session_state
-        or st.session_state.get("current_model") != selected_model
-        or st.session_state.get("current_api_base") != api_base
-        or st.session_state.get("current_api_key") != api_key
-        or st.session_state.get("current_embedding_model") != embedding_model
-    )
-
-    if not needs_reinit:
+def _init_assistant() -> None:
+    """Initialize APIChatPDF using env-loaded credentials."""
+    if "assistant" in st.session_state:
         return
+
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    api_base = os.environ.get("OPENAI_API_BASE", "https://api.longcat.chat/openai/v1")
+    embedding_model = os.environ.get("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
+    chat_model = os.environ.get("OPENAI_MODEL", "LongCat-Flash-Lite")
+
+    if not api_key:
+        st.error(
+            "No API key found. Set `OPENAI_API_KEY` in your `.env.local` file and restart."
+        )
+        st.stop()
 
     st.session_state["assistant"] = APIChatPDF(
         openai_api_key=api_key,
-        openai_model=selected_model,
+        openai_model=chat_model,
         openai_api_base=api_base,
         embedding_model=embedding_model,
     )
-    st.session_state["current_model"] = selected_model
-    st.session_state["current_api_base"] = api_base
-    st.session_state["current_api_key"] = api_key
-    st.session_state["current_embedding_model"] = embedding_model
 
 
 def page() -> None:
     """Main app page layout."""
     if len(st.session_state) == 0:
         st.session_state["messages"] = []
-        st.session_state["api_key"] = os.environ.get("OPENAI_API_KEY", "")
-        st.session_state["api_base"] = os.environ.get(
-            "OPENAI_API_BASE", "https://api.longcat.chat/openai/v1"
-        )
-        st.session_state["embedding_model"] = os.environ.get(
-            "EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"
-        )
+        st.session_state["retrieval_k"] = 5
+        st.session_state["retrieval_threshold"] = 0.2
+        st.session_state["ingested_files"] = set()
 
     st.header("RAG with OpenAI-Compatible API")
 
-    api_key = st.text_input(
-        "API Key",
-        value=st.session_state.get("api_key", ""),
-        type="password",
-        key="api_key_input",
-    ).strip()
-
-    api_base = st.text_input(
-        "API Base URL",
-        value=st.session_state.get("api_base", "https://api.longcat.chat/openai/v1"),
-        key="api_base_input",
-    ).strip()
-
-    embedding_model = st.text_input(
-        "Embedding Model (Hugging Face)",
-        value=st.session_state.get("embedding_model", "BAAI/bge-small-en-v1.5"),
-        key="embedding_model_input",
-    ).strip()
-
-    model_options = ["LongCat-Flash-Lite", "gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
-    selected_model = st.selectbox(
-        "Select Model",
-        options=model_options,
-        index=0,
-        key="model_selection",
-    )
-
-    if not api_key:
-        st.warning("Please enter your API key to continue.")
-        return
-
-    _init_assistant(api_key, api_base, selected_model, embedding_model)
+    _init_assistant()
 
     st.subheader("Upload a Document")
     st.file_uploader(
@@ -159,10 +163,14 @@ def page() -> None:
 
     st.subheader("Settings")
     st.session_state["retrieval_k"] = st.slider(
-        "Number of Retrieved Results (k)", min_value=1, max_value=10, value=5
+        "Number of Retrieved Results (k)", min_value=1, max_value=10, value=st.session_state["retrieval_k"]
     )
     st.session_state["retrieval_threshold"] = st.slider(
-        "Similarity Score Threshold", min_value=0.0, max_value=1.0, value=0.2, step=0.05
+        "Similarity Score Threshold",
+        min_value=0.0,
+        max_value=1.0,
+        value=st.session_state["retrieval_threshold"],
+        step=0.05,
     )
 
     display_messages()
